@@ -1,0 +1,107 @@
+#!/bin/bash
+
+flow_conf=$1
+flow_id=$2
+dispatcher="/tmp/${flow_id}_dispatcher.sh"
+dispatch_dir=".dispather"
+single_target_dir=$dispatch_dir/single_targets
+tpl_dir=$(dirname $(which $0))
+task_tpl=tpl_task.sh
+task_tpl_path=$tpl_dir/$task_tpl
+common_tpl=tpl_common.sh
+common_tpl_path=$tpl_dir/$common_tpl
+target_log_dir="/var/log/tflow/"
+
+
+func_script="/tmp/$$_func_script.sh"
+fifos_to_make="/tmp/$$_fifos_to_make.sh"
+target_runner="/tmp/$$_target_runner"
+
+clear_tmp_files(){
+	rm -rf $dispatch_dir
+	rm -rf $dispatcher
+}
+
+init_env(){
+	mkdir -p $single_target_dir
+}
+
+gen_single_targets(){
+	i=0
+	cat $flow_conf | while read ln;
+	do
+		echo $ln | sed 's|^target\s*\(\S*\)(\(.*\))\s*\(.*$\)|target=\"\1\"\ndep=\"\2\"\ncmd=\"\3\"\n|g' > $single_target_dir/$i.target
+		i=$((i+1)); 
+	done
+}
+
+write_pre_code(){
+	echo "#!/bin/bash" > $dispatcher
+	echo "log_dir=$target_log_dir" >> $dispatcher
+	echo "mkdir -p \$log_dir" >> $dispatcher
+	echo >> $dispatcher
+}
+prepare_target_func(){
+	cp $task_tpl_path /tmp/
+	sed -i "s|TPL_TARGET|$target|g" /tmp/$task_tpl
+	sed -i "s|TPL_DEP|$dep|g" /tmp/$task_tpl
+	sed -i "s|TPL_CMD|$cmd|g" /tmp/$task_tpl
+	cat /tmp/$task_tpl >> $func_script
+	rm -rf /tmp/$task_tpl
+}
+prepare_fifos_to_make(){
+	for d in $dep
+	do
+		echo "/tmp/flow_\$\$_${target}_wait_${d} \\" >> $fifos_to_make
+	done
+}
+write_fifo_maker(){
+	echo -n "fifos=\"" >> $dispatcher
+	cat $fifos_to_make >> $dispatcher
+	echo "\"" >> $dispatcher
+	echo >> $dispatcher
+	echo "mk_fifos" >> $dispatcher
+	echo >> $dispatcher
+}
+prepare_target_runner(){
+	echo "target_$target \$\$ | xargs -n1 -I {} echo \"\$\$: \$(date): {}\" 1>>\$log_dir/target_${target}.log &" >> $target_runner
+}
+write_end(){
+	echo 'echo waiting....' >> $dispatcher
+	echo wait >> $dispatcher
+	echo "clear_fifos" >> $dispatcher
+	echo "exit \$?" >> $dispatcher
+}
+gen_dispatcher(){
+	targets=$(ls $single_target_dir)
+	for t in $targets
+	do
+		. $single_target_dir/$t
+
+		dep=$(echo $dep | sed "s|,| |g")
+		echo parsing target: $target
+		prepare_target_func
+		prepare_fifos_to_make
+		prepare_target_runner
+	done
+
+	write_pre_code
+	cat $common_tpl_path >> $dispatcher
+	cat $func_script >> $dispatcher
+	write_fifo_maker
+	cat $target_runner >> $dispatcher
+	write_end
+
+	rm -rf $func_script
+	rm -rf $fifos_to_make
+	rm -rf $target_runner
+}
+
+
+clear_tmp_files
+init_env
+gen_single_targets
+gen_dispatcher
+chmod a+x $dispatcher
+
+exit 0

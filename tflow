@@ -1,0 +1,27 @@
+#!/bin/bash
+
+FLOW_ID=$$
+APP_PATH=$(which $0)
+
+show_help(){
+	echo "
+tflow [flow config]	read flow.conf from current directory if [flow config] was not specified
+"
+}
+
+flow_conf=$1
+[[ -n $FLOW_CONF ]] || FLOW_CONF="flow.conf"
+if [[ ! -f $FLOW_CONF ]]; then
+	echo "${FLOW_CONF} not found" 
+	show_help 
+	exit 1
+fi
+
+tflow-parser $FLOW_CONF $FLOW_ID
+
+
+DISPATCHER=/tmp/${FLOW_ID}_dispatcher.sh
+echo running dispatcher 
+$DISPATCHER
+rm -f $DISPATCHER
+echo Please check log in /var/log/tflow/
