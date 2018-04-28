@@ -1,10 +1,9 @@
 write_ret_val(){
-	#dispatcher=dispatcher_pid
-	dispatcher=$1
+	flow_id=$1
 	target=$2
 	ret=$3
 
-	be_dep=$(ls /tmp/flow_${dispatcher}_*_wait_${target} 2>/dev/null)
+	be_dep=$(ls /tmp/flow_${flow_id}_*_wait_${target} 2>/dev/null)
 
 	echo write_ret_val: be_dep: $be_dep
 
@@ -13,7 +12,10 @@ write_ret_val(){
 		echo write_ret_val: write $ret to $bd
 		echo $ret > $bd &
 	done
-	
+
+	# report to flow
+	echo $target write $ret to $be_dep > /tmp/flow_${flow_id} &
+	echo $target finish > /tmp/flow_${flow_id} &
 	echo write_ret_val: write finish
 }
 
@@ -21,11 +23,11 @@ write_ret_val(){
 #write_ret_val 11 D 1
 
 wait_dep(){
-	dispatcher=$1
+	flow_id=$1
 	target=$2
 	all_ret=0
 
-	fifos=$(ls /tmp/flow_${dispatcher}_${target}_wait_* 2>/dev/null)
+	fifos=$(ls /tmp/flow_${flow_id}_${target}_wait_* 2>/dev/null)
 
 	echo wait_dep: $target wait fifos: $fifos
         for f in $fifos

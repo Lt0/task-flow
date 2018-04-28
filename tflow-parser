@@ -38,6 +38,7 @@ gen_single_targets(){
 write_pre_code(){
 	echo "#!/bin/bash" > $dispatcher
 	echo "log_dir=$target_log_dir" >> $dispatcher
+	echo "flow_id=$flow_id" >> $dispatcher
 	echo "mkdir -p \$log_dir" >> $dispatcher
 	echo >> $dispatcher
 }
@@ -52,11 +53,12 @@ prepare_target_func(){
 prepare_fifos_to_make(){
 	for d in $dep
 	do
-		echo "/tmp/flow_\$\$_${target}_wait_${d} \\" >> $fifos_to_make
+		echo "/tmp/flow_\${flow_id}_${target}_wait_${d} \\" >> $fifos_to_make
 	done
 }
 write_fifo_maker(){
 	echo -n "fifos=\"" >> $dispatcher
+	echo "/tmp/flow_\$flow_id" >> $dispatcher
 	cat $fifos_to_make >> $dispatcher
 	echo "\"" >> $dispatcher
 	echo >> $dispatcher
@@ -64,7 +66,7 @@ write_fifo_maker(){
 	echo >> $dispatcher
 }
 prepare_target_runner(){
-	echo "target_$target \$\$ | xargs -n1 -I {} echo \"\$\$: \$(date): {}\" 1>>\$log_dir/target_${target}.log &" >> $target_runner
+	echo "target_$target \$flow_id | xargs -n1 -I {} echo \"\$\$: \$(date): {}\" 1>>\$log_dir/target_${target}.log &" >> $target_runner
 }
 write_end(){
 	echo 'echo waiting....' >> $dispatcher

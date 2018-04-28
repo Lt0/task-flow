@@ -9,6 +9,14 @@ tflow [flow config]	read flow.conf from current directory if [flow config] was n
 "
 }
 
+# get report from targets
+get_report(){
+	while true
+	do
+		cat /tmp/flow_${FLOW_ID} 2>/dev/null
+	done
+}
+
 flow_conf=$1
 [[ -n $FLOW_CONF ]] || FLOW_CONF="flow.conf"
 if [[ ! -f $FLOW_CONF ]]; then
@@ -22,6 +30,10 @@ tflow-parser $FLOW_CONF $FLOW_ID
 
 DISPATCHER=/tmp/${FLOW_ID}_dispatcher.sh
 echo running dispatcher 
-$DISPATCHER
+$DISPATCHER &
+DISPATCHER_PID=$!
+get_report &
+
+wait $DISPATCHER_PID
 rm -f $DISPATCHER
 echo Please check log in /var/log/tflow/
